@@ -2801,6 +2801,52 @@ public abstract partial class JsonRpcTests : TestBase
         }
     }
 
+    [Fact]
+    public async Task CorrelationManagerActivity_ServerDispatchTracesHaveActivityId()
+    {
+        // Verify that all server-side StreamJsonRpc traces emitted during RPC dispatch
+        // (RequestReceived, LocalInvocation) have a non-empty activity ID that matches
+        // the activity ID seen by the server method during execution.
+        var strategy = new CorrelationManagerTracingStrategy
+        {
+            TraceSource = new TraceSource("strategy", SourceLevels.ActivityTracing | SourceLevels.Information),
+        };
+        this.clientRpc.AllowModificationWhileListening = true;
+        this.clientRpc.ActivityTracingStrategy = strategy;
+        this.serverRpc.AllowModificationWhileListening = true;
+        this.serverRpc.ActivityTracingStrategy = strategy;
+
+        Guid clientActivityId = Guid.NewGuid();
+        Trace.CorrelationManager.ActivityId = clientActivityId;
+        Guid serverActivityId;
+        try
+        {
+            serverActivityId = await this.clientRpc.InvokeWithCancellationAsync<Guid>(nameof(Server.GetCorrelationManagerActivityId), cancellationToken: this.TimeoutToken);
+        }
+        finally
+        {
+            Trace.CorrelationManager.ActivityId = Guid.Empty;
+        }
+
+        // The server should have seen a non-empty, distinct activity ID.
+        Assert.NotEqual(Guid.Empty, serverActivityId);
+        Assert.NotEqual(clientActivityId, serverActivityId);
+
+        // Every dispatch-related trace on the server should have the same activity ID
+        // that the server method observed during execution.
+        var serverDispatchTraces = this.serverTraces.EventsWithActivityIds
+            .Where(e => e.TraceEventId == JsonRpc.TraceEvents.RequestReceived
+                     || e.TraceEventId == JsonRpc.TraceEvents.LocalInvocation)
+            .ToList();
+
+        Assert.NotEmpty(serverDispatchTraces);
+
+        foreach (var (traceEventId, activityId) in serverDispatchTraces)
+        {
+            Assert.Equal(serverActivityId, activityId);
+        }
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

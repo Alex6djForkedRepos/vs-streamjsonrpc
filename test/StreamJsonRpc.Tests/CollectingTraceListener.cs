@@ -17,6 +17,8 @@ public class CollectingTraceListener : TraceListener
 
     private readonly ImmutableList<(Guid RelatedActivityId, Guid CurrentActivityId)>.Builder transfers = ImmutableList.CreateBuilder<(Guid RelatedActivityId, Guid CurrentActivityId)>();
 
+    private readonly ImmutableList<(JsonRpc.TraceEvents TraceEventId, Guid ActivityId)>.Builder eventsWithActivityIds = ImmutableList.CreateBuilder<(JsonRpc.TraceEvents TraceEventId, Guid ActivityId)>();
+
     public override bool IsThreadSafe => false;
 
     public IReadOnlyList<string> Messages
@@ -63,6 +65,17 @@ public class CollectingTraceListener : TraceListener
         }
     }
 
+    public ImmutableList<(JsonRpc.TraceEvents TraceEventId, Guid ActivityId)> EventsWithActivityIds
+    {
+        get
+        {
+            lock (this.eventsWithActivityIds)
+            {
+                return this.eventsWithActivityIds.ToImmutable();
+            }
+        }
+    }
+
     public AsyncAutoResetEvent MessageReceived { get; } = new AsyncAutoResetEvent();
 
     public override void TraceTransfer(TraceEventCache? eventCache, string source, int id, string? message, Guid relatedActivityId)
@@ -87,6 +100,11 @@ public class CollectingTraceListener : TraceListener
             this.events.Add((eventType, format is null ? null : string.Format(CultureInfo.InvariantCulture, format, args ?? Array.Empty<object?>())));
         }
 
+        lock (this.eventsWithActivityIds)
+        {
+            this.eventsWithActivityIds.Add(((JsonRpc.TraceEvents)id, Trace.CorrelationManager.ActivityId));
+        }
+
         base.TraceEvent(eventCache, source, eventType, id, format, args);
     }
 
@@ -102,6 +120,11 @@ public class CollectingTraceListener : TraceListener
             this.events.Add((eventType, message));
         }
 
+        lock (this.eventsWithActivityIds)
+        {
+            this.eventsWithActivityIds.Add(((JsonRpc.TraceEvents)id, Trace.CorrelationManager.ActivityId));
+        }
+
         base.TraceEvent(eventCache, source, eventType, id, message);
     }
 
@@ -115,6 +138,11 @@ public class CollectingTraceListener : TraceListener
         lock (this.events)
         {
             this.events.Add((eventType, null));
+        }
+
+        lock (this.eventsWithActivityIds)
+        {
+            this.eventsWithActivityIds.Add(((JsonRpc.TraceEvents)id, Trace.CorrelationManager.ActivityId));
         }
 
         base.TraceEvent(eventCache, source, eventType, id);

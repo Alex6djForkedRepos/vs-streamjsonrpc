@@ -1903,7 +1903,6 @@ public class JsonRpc : IDisposableObservable, IJsonRpcFormatterCallbacks, IJsonR
         Requires.NotNull(targetMethod);
 
         object? result;
-        using IDisposable? activityTracingState = this.ActivityTracingStrategy?.ApplyInboundActivity(request);
 
         try
         {
@@ -2807,10 +2806,17 @@ public class JsonRpc : IDisposableObservable, IJsonRpcFormatterCallbacks, IJsonR
     {
         Requires.NotNull(rpc, nameof(rpc));
         OutstandingCallData? data = null;
+        IDisposable? activityTracingState = null;
         try
         {
             if (rpc is JsonRpcRequest request)
             {
+                // Set up activity tracing before any dispatch-related traces so that
+                // RequestReceived, LocalInvocation, and other server-side trace events
+                // are emitted under the correct activity ID for cross-process correlation
+                // in tools like SvcTraceViewer.
+                activityTracingState = this.ActivityTracingStrategy?.ApplyInboundActivity(request);
+
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     if (request.IsResponseExpected)
@@ -2970,6 +2976,10 @@ public class JsonRpc : IDisposableObservable, IJsonRpcFormatterCallbacks, IJsonR
 
             // If we extracted this callback from the collection already, take care to complete it to avoid hanging our client.
             data?.CompletionHandler(null);
+        }
+        finally
+        {
+            activityTracingState?.Dispose();
         }
     }
 
