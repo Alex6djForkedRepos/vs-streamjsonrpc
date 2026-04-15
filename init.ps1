@@ -37,6 +37,8 @@
     The environment is configured to build pseudo-loc for JPN only, but may be used to build
     all languages with shipping-style loc by using the `/p:loctype=full,loclanguages=vs`
     when building.
+.PARAMETER Setup
+    Install the MicroBuild setup plugin for building VSIXv3 packages.
 .PARAMETER OptProf
     Install the MicroBuild OptProf plugin for building optimized assemblies on desktop machines.
 .PARAMETER Sbom
@@ -64,6 +66,8 @@ Param (
     [switch]$Signing,
     [Parameter()]
     [switch]$Localization,
+    [Parameter()]
+    [switch]$Setup,
     [Parameter()]
     [switch]$OptProf,
     [Parameter()]
@@ -132,6 +136,10 @@ try {
         $EnvVars['SignType'] = "Test"
     }
 
+    if ($Setup) {
+        Write-Host "Installing MicroBuild SwixBuild plugin..." -ForegroundColor $HeaderColor
+        & $InstallNuGetPkgScriptPath Microsoft.VisualStudioEng.MicroBuild.Plugins.SwixBuild -source $MicroBuildPackageSource -Verbosity $nugetVerbosity
+    }
     if ($OptProf) {
         Write-Host "Installing MicroBuild OptProf plugin" -ForegroundColor $HeaderColor
         & $InstallNuGetPkgScriptPath MicroBuild.Plugins.OptProf -source $MicroBuildPackageSource -Verbosity $nugetVerbosity
