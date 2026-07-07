@@ -59,6 +59,9 @@ public abstract class TestBase : IDisposable
     protected static void AssertCollectedObject(WeakReference weakReference)
     {
         GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
 
         // For some reason the assertion tends to be sketchy when running on Azure Pipelines.
         if (IsTestRunOnAzurePipelines)
