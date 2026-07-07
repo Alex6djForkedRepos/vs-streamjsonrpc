@@ -42,8 +42,6 @@ public abstract class TestBase : IDisposable
 
     protected static CancellationToken UnexpectedTimeoutToken => new CancellationTokenSource(UnexpectedTimeout).Token;
 
-    protected static bool IsTestRunOnAzurePipelines => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SYSTEM_DEFINITIONID"));
-
     protected ITestOutputHelper Logger { get; }
 
     protected CancellationToken TimeoutToken => Debugger.IsAttached ? CancellationToken.None : this.timeoutTokenSource.Token;
@@ -62,12 +60,6 @@ public abstract class TestBase : IDisposable
         GC.WaitForPendingFinalizers();
         GC.Collect();
         GC.WaitForPendingFinalizers();
-
-        // For some reason the assertion tends to be sketchy when running on Azure Pipelines.
-        if (IsTestRunOnAzurePipelines)
-        {
-            Assert.SkipWhen(weakReference.IsAlive, "Weak reference is still alive.");
-        }
 
         Assert.False(weakReference.IsAlive);
     }
