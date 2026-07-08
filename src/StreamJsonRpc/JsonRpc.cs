@@ -2341,6 +2341,10 @@ public class JsonRpc : IDisposableObservable, IJsonRpcFormatterCallbacks, IJsonR
         {
             throw new TimeoutException(Resources.FormatOutboundInvocationTimedOut(nameof(this.OutboundRequestTimeout)), ex);
         }
+        catch (ConnectionLostException ex) when (timeoutCancellationSource?.IsCancellationRequested is true && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(Resources.FormatOutboundInvocationTimedOut(nameof(this.OutboundRequestTimeout)), ex);
+        }
         catch (OperationCanceledException ex) when (this.DisconnectedToken.IsCancellationRequested && !effectiveOutboundCancellationToken.IsCancellationRequested)
         {
             throw new ConnectionLostException(Resources.ConnectionDropped, ex);
