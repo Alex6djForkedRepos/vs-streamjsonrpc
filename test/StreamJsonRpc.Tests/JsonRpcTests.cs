@@ -1061,12 +1061,20 @@ public abstract partial class JsonRpcTests : TestBase
     [Fact]
     public async Task InvokeWithCancellationAsync_TimeoutAndDisconnectDuringSend_ThrowsTimeoutException()
     {
+        this.clientRpc.Dispose();
+        this.serverRpc.Dispose();
+        this.ReinitializeRpcWithoutListening(observeClientOutboundCancellation: true);
+        this.serverRpc.StartListening();
+        this.clientRpc.StartListening();
+
         this.clientRpc.OutboundRequestTimeout = TimeSpan.FromMilliseconds(50);
 
         using var writeStarted = new ManualResetEventSlim();
         using var releaseWrite = new ManualResetEventSlim();
+        var clientRpc = Assert.IsType<CancellationObservingJsonRpc>(this.clientRpc);
+        var clientStream = (Nerdbank.FullDuplexStream)this.clientStream;
         bool firstWrite = true;
-        ((Nerdbank.FullDuplexStream)this.clientStream).BeforeWrite = (stream, buffer, offset, count) =>
+        clientStream.BeforeWrite = (stream, buffer, offset, count) =>
         {
             if (firstWrite)
             {
@@ -1080,7 +1088,7 @@ public abstract partial class JsonRpcTests : TestBase
         {
             Task<string> invokeTask = this.clientRpc.InvokeWithCancellationAsync<string>(nameof(Server.AsyncMethodWithCancellation), new[] { "a" }, CancellationToken.None);
             Assert.True(writeStarted.Wait(UnexpectedTimeout, TestContext.Current.CancellationToken));
-            await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+            await clientRpc.OutboundCancellationObserved.WaitAsync(this.TimeoutToken);
             this.clientRpc.Dispose();
             releaseWrite.Set();
 
@@ -1089,7 +1097,7 @@ public abstract partial class JsonRpcTests : TestBase
         }
         finally
         {
-            ((Nerdbank.FullDuplexStream)this.clientStream).BeforeWrite = null;
+            clientStream.BeforeWrite = null;
             releaseWrite.Set();
         }
     }
@@ -3396,7 +3404,7 @@ public abstract partial class JsonRpcTests : TestBase
         return base.CheckGCPressureAsync(scenario, maxBytesAllocated, iterations, allowedAttempts);
     }
 
-    protected void ReinitializeRpcWithoutListening(bool controlledFlushingClient = false)
+    protected void ReinitializeRpcWithoutListening(bool controlledFlushingClient = false, bool observeClientOutboundCancellation = false)
     {
         var streams = Nerdbank.FullDuplexStream.CreateStreams();
         this.serverStream = streams.Item1;
@@ -3405,7 +3413,9 @@ public abstract partial class JsonRpcTests : TestBase
         this.InitializeFormattersAndHandlers(controlledFlushingClient);
 
         this.serverRpc = new JsonRpc(this.serverMessageHandler, this.server);
-        this.clientRpc = new JsonRpc(this.clientMessageHandler);
+        this.clientRpc = observeClientOutboundCancellation
+            ? new CancellationObservingJsonRpc(this.clientMessageHandler)
+            : new JsonRpc(this.clientMessageHandler);
 
         this.AddTracing();
     }
@@ -4567,6 +4577,22 @@ public abstract partial class JsonRpcTests : TestBase
             }
 
             return base.LoadTypeTrimSafe(typeFullName, assemblyName);
+        }
+    }
+
+    private sealed class CancellationObservingJsonRpc : JsonRpc
+    {
+        internal CancellationObservingJsonRpc(IJsonRpcMessageHandler messageHandler)
+            : base(messageHandler)
+        {
+        }
+
+        internal AsyncManualResetEvent OutboundCancellationObserved { get; } = new AsyncManualResetEvent();
+
+        protected override ValueTask SendAsync(JsonRpcMessage message, CancellationToken cancellationToken)
+        {
+            cancellationToken.Register(this.OutboundCancellationObserved.Set);
+            return base.SendAsync(message, cancellationToken);
         }
     }
 
