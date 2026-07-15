@@ -7,11 +7,11 @@
 	],
 	"packageRules": [
 		{
-			"matchPackageNames": [ "Microsoft.AspNetCore.TestHost" ],
+			"matchPackageNames": ["Microsoft.AspNetCore.TestHost"],
 			"allowedVersions": "<2.4"
 		},
 		{
-			"matchJsonata": [ "sharedVariableName='RoslynVersionForAnalyzers'" ],
+			"matchFileNames": ["Directory.Packages.Analyzers.props"],
 			"enabled": false
 		}
 	]
