@@ -1061,8 +1061,6 @@ public abstract partial class JsonRpcTests : TestBase
     [Fact]
     public async Task InvokeWithCancellationAsync_TimeoutAndDisconnectDuringSend_ThrowsTimeoutException()
     {
-        this.clientRpc.Dispose();
-        this.serverRpc.Dispose();
         this.ReinitializeRpcWithoutListening(blockingClientSend: true);
         this.serverRpc.StartListening();
         this.clientRpc.StartListening();
@@ -3392,6 +3390,9 @@ public abstract partial class JsonRpcTests : TestBase
 
     protected void ReinitializeRpcWithoutListening(bool controlledFlushingClient = false, bool blockingClientSend = false)
     {
+        this.clientRpc?.Dispose();
+        this.serverRpc?.Dispose();
+
         var streams = Nerdbank.FullDuplexStream.CreateStreams();
         this.serverStream = streams.Item1;
         this.clientStream = streams.Item2;
