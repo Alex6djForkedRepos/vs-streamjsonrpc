@@ -1061,36 +1061,30 @@ public abstract partial class JsonRpcTests : TestBase
     [Fact]
     public async Task InvokeWithCancellationAsync_TimeoutAndDisconnectDuringSend_ThrowsTimeoutException()
     {
+        this.clientRpc.Dispose();
+        this.serverRpc.Dispose();
+        this.ReinitializeRpcWithoutListening(blockingClientSend: true);
+        this.serverRpc.StartListening();
+        this.clientRpc.StartListening();
+
         this.clientRpc.OutboundRequestTimeout = TimeSpan.FromMilliseconds(50);
 
-        using var writeStarted = new ManualResetEventSlim();
-        using var releaseWrite = new ManualResetEventSlim();
-        bool firstWrite = true;
-        ((Nerdbank.FullDuplexStream)this.clientStream).BeforeWrite = (stream, buffer, offset, count) =>
-        {
-            if (firstWrite)
-            {
-                firstWrite = false;
-                writeStarted.Set();
-                Assert.True(releaseWrite.Wait(UnexpectedTimeout));
-            }
-        };
+        var clientRpc = Assert.IsType<BlockingSendJsonRpc>(this.clientRpc);
 
         try
         {
             Task<string> invokeTask = this.clientRpc.InvokeWithCancellationAsync<string>(nameof(Server.AsyncMethodWithCancellation), new[] { "a" }, CancellationToken.None);
-            Assert.True(writeStarted.Wait(UnexpectedTimeout, TestContext.Current.CancellationToken));
-            await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+            await clientRpc.RequestSendStarted.WaitAsync(this.TimeoutToken);
+            await clientRpc.OutboundCancellationObserved.WaitAsync(this.TimeoutToken);
             this.clientRpc.Dispose();
-            releaseWrite.Set();
+            clientRpc.AllowRequestSend.Set();
 
             TimeoutException ex = await Assert.ThrowsAsync<TimeoutException>(() => invokeTask);
             Assert.Contains(nameof(JsonRpc.OutboundRequestTimeout), ex.Message, StringComparison.Ordinal);
         }
         finally
         {
-            ((Nerdbank.FullDuplexStream)this.clientStream).BeforeWrite = null;
-            releaseWrite.Set();
+            clientRpc.AllowRequestSend.Set();
         }
     }
 
@@ -3396,7 +3390,7 @@ public abstract partial class JsonRpcTests : TestBase
         return base.CheckGCPressureAsync(scenario, maxBytesAllocated, iterations, allowedAttempts);
     }
 
-    protected void ReinitializeRpcWithoutListening(bool controlledFlushingClient = false)
+    protected void ReinitializeRpcWithoutListening(bool controlledFlushingClient = false, bool blockingClientSend = false)
     {
         var streams = Nerdbank.FullDuplexStream.CreateStreams();
         this.serverStream = streams.Item1;
@@ -3405,7 +3399,9 @@ public abstract partial class JsonRpcTests : TestBase
         this.InitializeFormattersAndHandlers(controlledFlushingClient);
 
         this.serverRpc = new JsonRpc(this.serverMessageHandler, this.server);
-        this.clientRpc = new JsonRpc(this.clientMessageHandler);
+        this.clientRpc = blockingClientSend
+            ? new BlockingSendJsonRpc(this.clientMessageHandler)
+            : new JsonRpc(this.clientMessageHandler);
 
         this.AddTracing();
     }
@@ -4567,6 +4563,34 @@ public abstract partial class JsonRpcTests : TestBase
             }
 
             return base.LoadTypeTrimSafe(typeFullName, assemblyName);
+        }
+    }
+
+    private sealed class BlockingSendJsonRpc : JsonRpc
+    {
+        internal BlockingSendJsonRpc(IJsonRpcMessageHandler messageHandler)
+            : base(messageHandler)
+        {
+        }
+
+        internal AsyncManualResetEvent RequestSendStarted { get; } = new AsyncManualResetEvent();
+
+        internal AsyncManualResetEvent AllowRequestSend { get; } = new AsyncManualResetEvent();
+
+        internal AsyncManualResetEvent OutboundCancellationObserved { get; } = new AsyncManualResetEvent();
+
+        protected override async ValueTask SendAsync(JsonRpcMessage message, CancellationToken cancellationToken)
+        {
+            if (message is JsonRpcRequest)
+            {
+                this.RequestSendStarted.Set();
+                using (cancellationToken.Register(this.OutboundCancellationObserved.Set))
+                {
+                    await this.AllowRequestSend.WaitAsync(CancellationToken.None);
+                }
+            }
+
+            await base.SendAsync(message, cancellationToken);
         }
     }
 
