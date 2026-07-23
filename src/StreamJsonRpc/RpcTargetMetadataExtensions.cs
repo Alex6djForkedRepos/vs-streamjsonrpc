@@ -46,6 +46,7 @@ public static class RpcTargetMetadataExtensions
     }
 
 #if NET8_0
+#pragma warning disable CS0419 // Newtonsoft.Json also declares an internal RequiresDynamicCodeAttribute
     /// <summary>
     /// A message to use as the argument to <see cref="RequiresDynamicCodeAttribute"/>
     /// for methods that call into <see cref="TypeShapeResolver.ResolveDynamicOrThrow{T}"/>.
@@ -54,6 +55,7 @@ public static class RpcTargetMetadataExtensions
     private const string ResolveDynamicMessage =
         "Dynamic resolution of IShapeable<T> interface may require dynamic code generation in .NET 8 Native AOT. " +
         "It is recommended to switch to statically resolved IShapeable<T> APIs or upgrade your app to .NET 9 or later.";
+#pragma warning restore CS0419
 #endif
 }
 
