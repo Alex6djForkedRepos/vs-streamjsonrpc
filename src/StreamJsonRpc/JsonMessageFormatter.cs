@@ -673,6 +673,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
         return id;
     }
 
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class TopLevelPropertyBag : TopLevelPropertyBagBase
     {
         private readonly JsonSerializer jsonSerializer;
@@ -747,6 +748,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
 
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     [DataContract]
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class OutboundJsonRpcRequest : JsonRpcRequestBase
     {
         private readonly JsonMessageFormatter formatter;
@@ -761,6 +763,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
 
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     [DataContract]
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class InboundJsonRpcRequest : JsonRpcRequestBase
     {
         private readonly JsonMessageFormatter formatter;
@@ -844,6 +847,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
 
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     [DataContract]
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class JsonRpcResult : JsonRpcResultBase
     {
         private readonly JsonMessageFormatter formatter;
@@ -918,6 +922,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
         protected override TopLevelPropertyBagBase? CreateTopLevelPropertyBag() => new TopLevelPropertyBag(this.formatter.JsonSerializer);
     }
 
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class JsonRpcError : JsonRpcErrorBase
     {
         private readonly JsonSerializer jsonSerializer;
@@ -931,6 +936,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
     }
 
     [DataContract]
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class ErrorDetail : Protocol.JsonRpcError.ErrorDetail
     {
         private readonly JsonSerializer jsonSerializer;
@@ -1296,6 +1302,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
         }
     }
 
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class JsonConverterFormatter : IFormatterConverter
     {
         private readonly JsonSerializer serializer;
@@ -1350,7 +1357,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
         public ulong ToUInt64(object value) => ((JToken)value).ToObject<ulong>(this.serializer);
     }
 
-    [RequiresUnreferencedCode(RuntimeReasons.LoadType)]
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.LoadType)]
     private class ExceptionConverter : JsonConverter<Exception?>
     {
         /// <summary>
@@ -1460,6 +1467,7 @@ public class JsonMessageFormatter : FormatterBase, IJsonRpcAsyncMessageTextForma
         }
     }
 
+    [RequiresDynamicCode(RuntimeReasons.Formatters), RequiresUnreferencedCode(RuntimeReasons.Formatters)]
     private class MarshalContractResolver : IContractResolver
     {
         private readonly JsonMessageFormatter formatter;
